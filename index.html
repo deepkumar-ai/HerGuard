@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#000000" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="HER GUARD" />
+<meta name="description" content="Privacy-first personal safety net with live telemetry, automatic escalation and covert duress." />
+<title>HER GUARD</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/icon-192.png" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+:root{
+  --bg:#000;
+  --card:rgba(28,28,30,.68);
+  --card-strong:rgba(44,44,46,.72);
+  --stroke:rgba(255,255,255,.08);
+  --stroke-strong:rgba(255,255,255,.14);
+  --label:#f5f5f7;
+  --label2:rgba(235,235,245,.62);
+  --label3:rgba(235,235,245,.32);
+  --pink:#ff375f;
+  --green:#30d158;
+  --orange:#ff9f0a;
+  --blue:#0a84ff;
+  --purple:#5e5ce6;
+  --radius:22px;
+  --tabbar:56px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none !important}
+html,body{height:100%}
+html{scroll-padding-bottom:calc(var(--tabbar) + var(--safe-b) + 24px)}
+body{
+  margin:0;background:var(--bg);color:var(--label);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  overscroll-behavior-y:none;
+}
+body::before{
+  content:"";position:fixed;inset:-25% -10% auto -10%;height:70%;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(45% 45% at 78% 8%, rgba(255,55,95,.20), transparent 70%),
+    radial-gradient(45% 45% at 8% 26%, rgba(94,92,230,.20), transparent 70%);
+  filter:blur(30px);
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input{font:inherit}
+
+/* ---------- shell ---------- */
+#app{
+  position:relative;z-index:1;max-width:480px;margin:0 auto;min-height:100dvh;
+  padding:calc(var(--safe-t) + 20px) 18px calc(var(--tabbar) + var(--safe-b) + 28px);
+}
+.app-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}
+.eyebrow{margin:0;font-size:13px;color:var(--label2);letter-spacing:.01em}
+.large-title{margin:2px 0 0;font-size:32px;line-height:1.1;font-weight:800;letter-spacing:-.02em}
+.view-title{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0 0 16px}
+.section-title{margin:0 0 4px;font-size:15px;font-weight:650;letter-spacing:-.01em}
+.muted{margin:0;font-size:13px;line-height:1.45;color:var(--label2)}
+.hint{margin:10px 0 0;font-size:12px;color:var(--label3);text-align:center}
+
+.conn{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;
+  background:var(--card-strong);border:.5px solid var(--stroke);backdrop-filter:blur(20px);
+  font-size:12px;font-weight:600;color:var(--label2);white-space:nowrap}
+.conn .dot{width:7px;height:7px;border-radius:50%;background:var(--orange)}
+.conn.ok .dot{background:var(--green);box-shadow:0 0 8px rgba(48,209,88,.8)}
+.conn.bad .dot{background:var(--pink)}
+
+/* ---------- cards ---------- */
+.card{
+  background:var(--card);border:.5px solid var(--stroke);border-radius:var(--radius);
+  padding:18px;backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
+  box-shadow:0 12px 32px rgba(0,0,0,.42);
+  margin-bottom:14px;
+}
+.stack{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:12px}
+.between{justify-content:space-between}
+.grow{flex:1;min-width:0}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 20px;
+  border-radius:999px;font-size:15px;font-weight:650;letter-spacing:-.01em;transition:transform .15s ease,opacity .15s ease}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-ghost{background:var(--card-strong);border:.5px solid var(--stroke-strong);color:var(--label)}
+.btn-danger{background:var(--pink);color:#fff}
+.btn-green{background:var(--green);color:#04150a}
+.btn-warn{background:var(--orange);color:#1a1000}
+.btn-block{width:100%;padding:15px 20px}
+.btn:disabled{opacity:.4;pointer-events:none}
+
+/* ---------- status ---------- */
+.status-title{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em}
+.status-sub{margin:2px 0 0;font-size:13px;color:var(--label2)}
+.state-dot{width:11px;height:11px;border-radius:50%;background:var(--label3);flex:none}
+.state-dot.on{background:var(--green);box-shadow:0 0 0 4px rgba(48,209,88,.16)}
+.state-dot.alert{background:var(--pink);box-shadow:0 0 0 4px rgba(255,55,95,.18);animation:beat 1.3s infinite}
+@keyframes beat{0%,100%{opacity:1}50%{opacity:.45}}
+.status-actions{display:flex;gap:10px;margin-top:16px}
+
+/* ---------- trip ---------- */
+.progress{height:8px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:14px}
+.progress div{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#0a84ff,#5e5ce6);
+  transition:width .8s cubic-bezier(.32,.72,0,1)}
+.trip-off .progress div{background:linear-gradient(90deg,#ff9f0a,#ff375f)}
+
+/* ---------- voice watch ---------- */
+#voiceMode{position:fixed;left:0;right:0;bottom:calc(var(--tabbar) + var(--safe-b) + 12px);z-index:55;
+  display:flex;align-items:center;gap:12px;max-width:452px;margin:0 auto;
+  padding:14px 16px;border-radius:20px;
+  background:rgba(28,28,30,.92);border:.5px solid rgba(255,159,10,.45);
+  backdrop-filter:blur(26px);box-shadow:0 14px 40px rgba(0,0,0,.5)}
+.voice-dot{width:12px;height:12px;border-radius:50%;background:var(--orange);flex:none;
+  box-shadow:0 0 0 5px rgba(255,159,10,.16);animation:beat 1.1s infinite}
+.voice-bars{display:flex;align-items:flex-end;gap:3px;height:20px;flex:none}
+.voice-bars i{width:3px;background:var(--orange);border-radius:2px;animation:bar 1s infinite ease-in-out}
+.voice-bars i:nth-child(1){height:8px;animation-delay:0s}
+.voice-bars i:nth-child(2){height:16px;animation-delay:.15s}
+.voice-bars i:nth-child(3){height:11px;animation-delay:.3s}
+.voice-bars i:nth-child(4){height:18px;animation-delay:.45s}
+@keyframes bar{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+
+/* ---------- plan sheet ---------- */
+.pickrow{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:13px;
+  background:rgba(255,255,255,.06);border:.5px solid var(--stroke);font-size:14px;color:var(--label2)}
+.pickrow b{color:var(--label);font-weight:600}
+.result{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;padding:12px 4px;
+  border-bottom:.5px solid var(--stroke)}
+.result:last-child{border-bottom:none}
+.preview{margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(10,132,255,.1);
+  border:.5px solid rgba(10,132,255,.3);font-size:13px;color:#cfe4ff}
+
+/* ---------- risk ---------- */
+.risk-card{display:flex;align-items:center;gap:18px}
+.risk-ring{position:relative;width:104px;height:104px;flex:none}
+.risk-ring svg{transform:rotate(-90deg)}
+.risk-ring .val{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.risk-ring .num{font-size:29px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.risk-ring .pct{font-size:11px;color:var(--label2);letter-spacing:.06em}
+.risk-note{font-size:13px;line-height:1.4;color:var(--label2)}
+.risk-note b{color:var(--label);font-weight:600}
+
+/* ---------- SOS ---------- */
+.sos-wrap{display:flex;flex-direction:column;align-items:center;margin:22px 0 18px}
+.sos{
+  position:relative;width:176px;height:176px;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle at 50% 28%, #ff5f7d, #d1002c 62%, #86001c);
+  box-shadow:0 20px 55px rgba(255,55,95,.34), inset 0 1px 0 rgba(255,255,255,.32);
+  color:#fff;font-size:27px;font-weight:800;letter-spacing:.16em;text-indent:.16em;
+  transition:transform .12s ease;
+}
+.sos:active{transform:scale(.965)}
+.sos .ring{position:absolute;inset:-9px;pointer-events:none}
+.sos .ring circle{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;opacity:.95;
+  stroke-dasharray:534;stroke-dashoffset:534;transform:rotate(-90deg);transform-origin:50% 50%}
+.sos small{display:block;font-size:10px;letter-spacing:.22em;font-weight:600;opacity:.85;margin-top:6px;text-indent:.22em}
+
+/* ---------- lists ---------- */
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:.5px solid var(--stroke)}
+.list li:last-child{border-bottom:none;padding-bottom:0}
+.ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;
+  background:rgba(255,255,255,.07);border:.5px solid var(--stroke);font-size:17px}
+.ic.rose{background:rgba(255,55,95,.14);border-color:rgba(255,55,95,.3)}
+.ic.green{background:rgba(48,209,88,.14);border-color:rgba(48,209,88,.28)}
+.ic.blue{background:rgba(10,132,255,.14);border-color:rgba(10,132,255,.3)}
+.li-title{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.li-sub{font-size:12px;color:var(--label2);margin-top:1px}
+.chip{font-size:11px;font-weight:650;padding:4px 10px;border-radius:999px;
+  background:rgba(255,255,255,.08);border:.5px solid var(--stroke);color:var(--label2);white-space:nowrap}
+.chip.t1{background:rgba(94,92,230,.16);border-color:rgba(94,92,230,.35);color:#c9c8ff}
+.chip.t2{background:rgba(255,55,95,.16);border-color:rgba(255,55,95,.35);color:#ffb3c4}
+.chip.live{background:rgba(48,209,88,.16);border-color:rgba(48,209,88,.35);color:#a6e8bd}
+
+/* ---------- map ---------- */
+.map-card{padding:8px;overflow:hidden}
+#map{height:min(48vh,360px);width:100%;border-radius:16px;background:#05070c}
+.leaflet-container{background:#05070c;font:inherit}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:rgba(28,28,30,.96);color:#f5f5f7;
+  border:.5px solid rgba(255,255,255,.1);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.leaflet-popup-content{margin:12px 14px;font-size:13px}
+.leaflet-control-zoom a{background:rgba(28,28,30,.9) !important;color:#f5f5f7 !important;
+  border-color:rgba(255,255,255,.12) !important}
+.leaflet-control-attribution{background:rgba(0,0,0,.5) !important;color:rgba(235,235,245,.45) !important;font-size:9px !important}
+.leaflet-control-attribution a{color:rgba(235,235,245,.6) !important}
+.you{position:relative;width:18px;height:18px}
+.you i{position:absolute;inset:0;border-radius:50%;background:#ff375f;border:2.5px solid #fff;
+  box-shadow:0 0 14px rgba(255,55,95,.95)}
+.you::after{content:"";position:absolute;inset:-9px;border-radius:50%;
+  border:2px solid rgba(255,55,95,.55);animation:radar 1.9s infinite}
+@keyframes radar{0%{transform:scale(.45);opacity:1}100%{transform:scale(1.35);opacity:0}}
+.haven-pin{width:26px;height:26px;border-radius:9px;display:grid;place-items:center;font-size:13px;
+  background:rgba(20,20,22,.92);border:.5px solid rgba(255,255,255,.16);backdrop-filter:blur(8px)}
+
+/* ---------- action tiles ---------- */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.tile{
+  display:flex;flex-direction:column;gap:12px;align-items:flex-start;padding:16px;
+  background:var(--card);border:.5px solid var(--stroke);border-radius:18px;
+  backdrop-filter:blur(24px) saturate(170%);text-align:left;transition:transform .15s ease;
+}
+.tile:active{transform:scale(.975)}
+.tile.on{border-color:rgba(255,55,95,.5);background:rgba(255,55,95,.12)}
+.tile .t-ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;
+  background:rgba(255,255,255,.08);border:.5px solid var(--stroke)}
+.tile .t-label{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.tile .t-sub{font-size:11px;color:var(--label3);margin-top:2px}
+
+/* ---------- tab bar ---------- */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;max-width:480px;margin:0 auto;
+  display:grid;grid-template-columns:repeat(4,1fr);
+  padding:8px 6px calc(6px + var(--safe-b));
+  background:rgba(18,18,20,.72);border-top:.5px solid var(--stroke);
+  backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);
+}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0;
+  font-size:10px;font-weight:600;letter-spacing:.01em;color:var(--label3);transition:color .18s ease}
+.tab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tab.active{color:var(--label)}
+.tab.active svg{stroke:var(--pink)}
+
+/* ---------- overlays ---------- */
+.overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(8px)}
+.overlay.center{align-items:center;padding:20px}
+.sheet{width:100%;max-width:480px;background:#1c1c1e;border-radius:26px 26px 0 0;
+  padding:20px 20px calc(20px + var(--safe-b));border-top:.5px solid var(--stroke-strong);
+  animation:up .32s cubic-bezier(.32,.72,0,1)}
+@keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet h3{margin:0 0 6px;font-size:20px;font-weight:750;letter-spacing:-.02em;text-align:center}
+.sheet p.sheet-sub{margin:0;font-size:13px;color:var(--label2);text-align:center;line-height:1.45}
+.sheet-actions{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.modal{width:100%;max-width:420px;background:#1c1c1e;border:.5px solid var(--stroke-strong);
+  border-radius:26px;padding:22px;max-height:92dvh;overflow:auto;
+  animation:pop .28s cubic-bezier(.32,.72,0,1)}
+@keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;color:var(--label2);margin-bottom:6px;font-weight:550}
+.field input{width:100%;padding:13px 14px;border-radius:14px;background:rgba(255,255,255,.06);
+  border:.5px solid var(--stroke-strong);color:var(--label);font-size:16px;outline:none}
+.field input:focus{border-color:var(--blue);background:rgba(10,132,255,.08)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.note{font-size:11.5px;line-height:1.5;color:var(--label3);margin:0}
+.err{margin:10px 0 0;font-size:12.5px;color:#ff8fa3}
+
+/* ---------- check-in ---------- */
+.cd{position:relative;width:112px;height:112px;margin:6px auto 14px}
+.cd svg{transform:rotate(-90deg)}
+.cd .cd-num{position:absolute;inset:0;display:grid;place-items:center;font-size:32px;font-weight:800;
+  letter-spacing:-.03em;color:#ffd27a}
+
+/* ---------- lock screen ---------- */
+#lockScreen{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:calc(var(--safe-t) + 24px) 22px calc(var(--safe-b) + 20px);
+  overflow-y:auto;overscroll-behavior:contain}
+#lockScreen .lock-top{position:absolute;top:calc(var(--safe-t) + 26px);left:0;right:0;text-align:center}
+.lock-ic{font-size:34px}
+.lock-title{margin:10px 0 4px;font-size:17px;font-weight:700;text-align:center}
+.lock-sub{margin:0;font-size:13px;color:var(--label2);text-align:center;max-width:280px}
+.dots{display:flex;gap:14px;margin:auto 0 6px}
+.dots span{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--label3)}
+.dots span.f{background:var(--label);border-color:var(--label)}
+.dots.shake{animation:shake .45s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+.keypad{display:grid;grid-template-columns:repeat(3,clamp(56px,17vw,72px));gap:clamp(8px,2.4vw,14px);
+  justify-content:center;margin-top:auto;flex:none}
+.key{width:clamp(56px,17vw,72px);height:clamp(56px,17vw,72px);border-radius:50%;
+  background:rgba(255,255,255,.09);border:.5px solid var(--stroke);
+  font-size:26px;font-weight:400;display:grid;place-items:center;transition:background .12s ease,transform .12s ease}
+.key:active{background:rgba(255,255,255,.2);transform:scale(.95)}
+.key.fn{font-size:16px;font-weight:600;background:transparent;border-color:transparent}
+#lockScreen .btn{margin-top:16px;width:min(280px,100%)}
+
+/* ---------- decoy ---------- */
+#decoy{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;
+  padding:calc(var(--safe-t) + 24px) 22px calc(var(--safe-b) + 24px);
+  background:linear-gradient(170deg,#0b1e33 0%,#132c46 45%,#1d3a55 100%)}
+.dc-city{font-size:22px;font-weight:600;letter-spacing:-.01em;text-align:center;margin:6px 0 0;color:#eaf2ff}
+.dc-temp{font-size:82px;font-weight:200;letter-spacing:-.05em;text-align:center;margin:14px 0 0;line-height:1;
+  color:#fff;-webkit-user-select:none;user-select:none}
+.dc-cond{text-align:center;font-size:15px;color:rgba(234,242,255,.72);margin:6px 0 0}
+.dc-hi{text-align:center;font-size:14px;color:rgba(234,242,255,.55);margin:4px 0 0}
+.dc-card{background:rgba(255,255,255,.09);border:.5px solid rgba(255,255,255,.14);border-radius:20px;
+  padding:16px;backdrop-filter:blur(18px);margin-top:26px}
+.dc-hours{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;text-align:center;
+  font-size:12px;color:rgba(234,242,255,.78)}
+.dc-hours .hr{font-size:20px;margin:6px 0}
+.dc-foot{margin-top:auto;text-align:center;font-size:11px;color:rgba(234,242,255,.34)}
+
+/* ---------- fake call ---------- */
+#fakeCall{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;align-items:center;
+  padding:calc(var(--safe-t) + 70px) 24px calc(var(--safe-b) + 40px);
+  background:linear-gradient(180deg,#0a0a0c 0%,#15151a 60%,#0a0a0c 100%)}
+.fc-avatar{width:104px;height:104px;border-radius:50%;display:grid;place-items:center;font-size:38px;font-weight:600;
+  background:linear-gradient(160deg,#3a3a3f,#1f1f24);border:.5px solid var(--stroke-strong);color:#e9e9ee}
+.fc-name{margin:18px 0 2px;font-size:28px;font-weight:600;letter-spacing:-.02em}
+.fc-sub{margin:0;font-size:14px;color:var(--label2)}
+.fc-status{margin-top:8px;font-size:13px;color:var(--label3);height:18px}
+.fc-btns{margin-top:auto;display:flex;justify-content:space-between;width:100%;max-width:320px;gap:60px}
+.fc-btn{display:flex;flex-direction:column;align-items:center;gap:9px;font-size:12px;color:var(--label2)}
+.fc-btn i{width:74px;height:74px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:31px}
+.fc-decline i{background:#ff3b30}
+.fc-accept i{background:#30d158}
+.fc-accept.alt i{background:#ff3b30}
+
+/* ---------- strobe & toast ---------- */
+#strobe{position:fixed;inset:0;z-index:65;pointer-events:none;background:rgba(255,55,95,.35)}
+#toasts{position:fixed;top:calc(var(--safe-t) + 14px);left:0;right:0;z-index:100;
+  display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 18px}
+.toast{max-width:420px;width:100%;padding:12px 16px;border-radius:16px;font-size:13.5px;font-weight:600;
+  background:rgba(44,44,46,.94);border:.5px solid var(--stroke-strong);backdrop-filter:blur(20px);
+  box-shadow:0 12px 30px rgba(0,0,0,.45);animation:pop .22s ease}
+.toast.ok{border-color:rgba(48,209,88,.45);color:#aff0c5}
+.toast.err{border-color:rgba(255,55,95,.45);color:#ffb9c8}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header class="app-header">
+    <div>
+      <p class="eyebrow" id="greeting">Welcome</p>
+      <h1 class="large-title" id="userName">HER GUARD</h1>
+    </div>
+    <div class="conn" id="connPill"><span class="dot"></span><span id="connText">Connecting</span></div>
+  </header>
+
+  <!-- ================= HOME ================= -->
+  <section class="view" data-view="home">
+    <div class="card">
+      <div class="row">
+        <span class="state-dot" id="stateDot"></span>
+        <div class="grow">
+          <p class="status-title" id="statusTitle">Protection off</p>
+          <p class="status-sub" id="statusSub">Start a journey to begin live monitoring</p>
+        </div>
+      </div>
+      <div class="status-actions">
+        <button id="btnJourney" class="btn btn-primary grow">Start Journey</button>
+        <button id="btnLock" class="btn btn-ghost">Lock</button>
+      </div>
+    </div>
+
+    <div class="card" id="tripCard" hidden>
+      <div class="row between">
+        <div class="grow">
+          <p class="li-sub">Heading to</p>
+          <p class="status-title" id="tripDest">—</p>
+        </div>
+        <span class="chip live" id="tripStatus">On route</span>
+      </div>
+      <div class="progress"><div id="tripBar"></div></div>
+      <div class="row between" style="margin-top:10px">
+        <span class="li-sub" id="tripRemaining">—</span>
+        <span class="li-sub" id="tripEta">—</span>
+      </div>
+      <p class="risk-note" id="tripNote" hidden style="margin-top:8px"></p>
+    </div>
+
+    <div class="sos-wrap">
+      <button id="btnSos" class="sos" aria-label="Trigger emergency SOS">
+        <svg class="ring" viewBox="0 0 180 180" aria-hidden="true">
+          <circle id="sosRing" cx="90" cy="90" r="85"></circle>
+        </svg>
+        SOS
+      </button>
+      <p class="hint">Tap, or hold for 3 seconds</p>
+    </div>
+
+    <div class="card risk-card">
+      <div class="risk-ring">
+        <svg width="104" height="104" viewBox="0 0 104 104" aria-hidden="true">
+          <circle cx="52" cy="52" r="46" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="9"></circle>
+          <circle id="riskArc" cx="52" cy="52" r="46" fill="none" stroke="#30d158" stroke-width="9"
+                  stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="289"></circle>
+        </svg>
+        <div class="val">
+          <div>
+            <div class="num" id="riskNum">0</div>
+            <div class="pct">RISK</div>
+          </div>
+        </div>
+      </div>
+      <div class="grow">
+        <p class="section-title" id="riskLabel">All clear</p>
+        <p class="risk-note" id="riskNote">Live telemetry starts with your journey.</p>
+      </div>
+    </div>
+
+    <div class="card" id="sosPanel" hidden>
+      <p class="section-title" id="sosPanelTitle">Emergency alert ready</p>
+      <p class="risk-note" id="sosMessage" style="margin-top:6px"></p>
+      <div class="status-actions" style="flex-wrap:wrap">
+        <button id="btnSms" class="btn btn-primary grow">Message guardian</button>
+        <button id="btnWhatsapp" class="btn btn-green grow">WhatsApp</button>
+      </div>
+      <div class="status-actions">
+        <button id="btnCall112" class="btn btn-danger grow">Call 112</button>
+        <button id="btnCallGuardian" class="btn btn-ghost grow">Call guardian</button>
+      </div>
+      <button id="btnStopAlarm" class="btn btn-ghost btn-block" style="margin-top:10px">Stop siren &amp; strobe</button>
+    </div>
+
+    <div class="card">
+      <div class="row between">
+        <p class="section-title" style="margin:0">Guardians</p>
+        <span class="chip" id="tierChip">Standby</span>
+      </div>
+      <ul class="list" id="guardianList" style="margin-top:8px"></ul>
+      <div class="status-actions" id="escalationActions" hidden>
+        <button id="btnAck" class="btn btn-ghost grow">Family acknowledged</button>
+        <button id="btnDispatch" class="btn btn-danger grow">Dispatch police</button>
+      </div>
+      <p class="risk-note" id="dispatchNote" hidden style="margin-top:10px"></p>
+    </div>
+  </section>
+
+  <!-- ================= RADAR ================= -->
+  <section class="view" data-view="radar" hidden>
+    <h2 class="view-title">Safe Radar</h2>
+    <div class="card map-card"><div id="map"></div></div>
+    <div class="card">
+      <div class="row between" style="margin-bottom:6px">
+        <p class="section-title" style="margin:0">Nearby safe zones</p>
+        <span class="chip" id="havenChip">Locating</span>
+      </div>
+      <ul class="list" id="havenList">
+        <li><div class="grow"><p class="li-title">Searching…</p><p class="li-sub">Waiting for a location fix</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= ACTIONS ================= -->
+  <section class="view" data-view="actions" hidden>
+    <h2 class="view-title">Quick Actions</h2>
+    <div class="grid2">
+      <button class="tile" id="btnFakeCall">
+        <span class="t-ic">📞</span>
+        <span><span class="t-label">Fake call</span><span class="t-sub">Looks like an incoming call</span></span>
+      </button>
+      <button class="tile" id="btnAlarm">
+        <span class="t-ic">🔊</span>
+        <span><span class="t-label" id="alarmLabel">Siren &amp; strobe</span><span class="t-sub" id="alarmSub">Off</span></span>
+      </button>
+      <button class="tile" id="btnVoice">
+        <span class="t-ic">🎙️</span>
+        <span><span class="t-label">Voice SOS</span><span class="t-sub">Say “help” or “bachao”</span></span>
+      </button>
+      <button class="tile" id="btnShake">
+        <span class="t-ic">📳</span>
+        <span><span class="t-label">Shake to alert</span><span class="t-sub" id="shakeSub">Off</span></span>
+      </button>
+    </div>
+    <div class="card">
+      <p class="section-title">How escalation works</p>
+      <p class="muted" style="margin-top:6px">
+        Triggering SOS alerts your guardians first. If nobody acknowledges, the system moves to a
+        police and campus-security dispatch with your live coordinates — automatically.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= PROFILE ================= -->
+  <section class="view" data-view="profile" hidden>
+    <h2 class="view-title">Profile</h2>
+    <div class="card">
+      <div class="row">
+        <div class="ic rose" id="avatar">🛡</div>
+        <div class="grow">
+          <p class="li-title" id="profileName">—</p>
+          <p class="li-sub" id="profilePhone">—</p>
+        </div>
+      </div>
+      <ul class="list" id="profileGuardians" style="margin-top:12px"></ul>
+    </div>
+
+    <div class="card">
+      <p class="section-title">Covert duress</p>
+      <p class="muted" style="margin-top:6px">
+        Lock the app and enter your duress PIN. The screen shows the same result as a normal unlock,
+        while a silent alert is sent to your guardians in the background.
+      </p>
+      <button id="btnLock2" class="btn btn-ghost btn-block" style="margin-top:14px">Open lock screen</button>
+    </div>
+
+    <div class="card">
+      <p class="section-title">Privacy</p>
+      <p class="muted" style="margin-top:6px">
+        Your location and route never leave this session and are deleted the moment a journey ends.
+        PINs are stored only as salted hashes. Nothing is written to this device.
+      </p>
+      <ul class="list" id="privacyRows" style="margin-top:10px">
+        <li><div class="ic blue">🔒</div><div class="grow"><p class="li-title">Journey data purged</p><p class="li-sub" id="purgeSub">Trail cleared on End Journey</p></div></li>
+        <li><div class="ic blue">🧮</div><div class="grow"><p class="li-title">PINs hashed</p><p class="li-sub">PBKDF2-SHA256, never reversible</p></div></li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<!-- ================= TAB BAR ================= -->
+<nav class="tabbar">
+  <button class="tab active" data-goto="home">
+    <svg viewBox="0 0 24 24"><path d="M3 10.6 12 3.5l9 7.1V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+    Home
+  </button>
+  <button class="tab" data-goto="radar">
+    <svg viewBox="0 0 24 24"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+    Radar
+  </button>
+  <button class="tab" data-goto="actions">
+    <svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"/></svg>
+    Actions
+  </button>
+  <button class="tab" data-goto="profile">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.6-4 3.8-6.5 7.5-6.5S18.9 17 19.5 21"/></svg>
+    Profile
+  </button>
+</nav>
+
+<!-- ================= ONBOARDING ================= -->
+<div class="overlay center" id="onboarding">
+  <div class="modal">
+    <div style="text-align:center;margin-bottom:18px">
+      <div style="font-size:40px">🛡️</div>
+      <h3 style="margin:8px 0 4px;font-size:22px;font-weight:750;letter-spacing:-.02em">Set up HER GUARD</h3>
+      <p class="muted" style="max-width:300px;margin:0 auto">Your guardians and two PINs. Everything stays in this session.</p>
+    </div>
+    <form id="onboardForm">
+      <div class="field"><label for="fName">Your name</label><input id="fName" required value="Deepika Bhakat" /></div>
+      <div class="field"><label for="fPhone">Your phone</label><input id="fPhone" type="tel" required value="9876543210" /></div>
+      <div class="two">
+        <div class="field"><label for="fG1Name">Guardian 1</label><input id="fG1Name" required value="Papa (Manoj Kumar)" /></div>
+        <div class="field"><label for="fG1Phone">Phone</label><input id="fG1Phone" type="tel" required value="9876543210" /></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="fG2Name">Guardian 2</label><input id="fG2Name" value="Brother" /></div>
+        <div class="field"><label for="fG2Phone">Phone</label><input id="fG2Phone" type="tel" value="9123456789" /></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="fPin">Safety PIN</label><input id="fPin" type="password" inputmode="numeric" autocomplete="new-password" required minlength="4" maxlength="8" placeholder="4–8 digits" /></div>
+        <div class="field"><label for="fDuress">Duress PIN</label><input id="fDuress" type="password" inputmode="numeric" autocomplete="new-password" required minlength="4" maxlength="8" placeholder="4–8 digits" /></div>
+      </div>
+      <p class="note">The duress PIN gives the same result on screen as your safety PIN, but silently raises a guardians’ alert.</p>
+      <p class="err" id="onboardErr" hidden></p>
+      <button type="submit" class="btn btn-danger btn-block" style="margin-top:16px">Continue</button>
+    </form>
+  </div>
+</div>
+
+<!-- ================= JOURNEY PLANNER ================= -->
+<div class="overlay" id="planSheet" hidden>
+  <div class="sheet">
+    <h3>Plan your journey</h3>
+    <p class="sheet-sub">We watch the route in real time and check in if anything looks wrong.</p>
+
+    <div class="field" style="margin-top:18px">
+      <label>From</label>
+      <div class="pickrow"><span>📍</span><span class="grow"><b id="planFromLabel">Your current location</b></span></div>
+    </div>
+
+    <div class="field">
+      <label for="destSearch">Destination</label>
+      <input id="destSearch" placeholder="Search a place" autocomplete="off" />
+    </div>
+
+    <div class="field">
+      <label>From (backup)</label>
+      <input id="fromInput" placeholder="Lat, lng or place name" autocomplete="off" style="font-size:14px" />
+      <p class="note" style="margin-top:-6px">Optional fallback if your location is off. Leave blank to use your current position.</p>
+    </div>
+
+    <ul class="list" id="destResults" hidden style="margin-bottom:6px"></ul>
+    <button id="btnPickMap" class="btn btn-ghost btn-block">Choose on map</button>
+
+    <div class="preview" id="planPreview" hidden></div>
+
+    <div class="sheet-actions">
+      <button id="btnStartPlanned" class="btn btn-primary btn-block" disabled>Start journey</button>
+      <button id="btnClosePlan" class="btn" style="color:var(--label2)">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="voiceMode" hidden>
+  <div class="voice-dot"></div>
+  <div class="grow">
+    <p class="status-title" style="font-size:15px">Voice watch active</p>
+    <p class="li-sub" id="voiceHint">Say “Bachao” or “Help”</p>
+  </div>
+  <div class="voice-bars"><i></i><i></i><i></i><i></i></div>
+</div>
+
+<!-- ================= CHECK-IN ================= -->
+<div class="overlay" id="checkin" hidden>
+  <div class="sheet">
+    <div class="cd">
+      <svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true">
+        <circle cx="56" cy="56" r="49" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="8"></circle>
+        <circle id="cdArc" cx="56" cy="56" r="49" fill="none" stroke="#ff9f0a" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="308" stroke-dashoffset="0"></circle>
+      </svg>
+      <div class="cd-num" id="cdNum">30</div>
+    </div>
+    <h3>Are you safe?</h3>
+    <p class="sheet-sub" id="cdReason">A movement anomaly was detected on your route.</p>
+    <div class="sheet-actions">
+      <button id="btnSafe" class="btn btn-green btn-block">Yes, I'm safe</button>
+      <button id="btnUnsafe" class="btn btn-danger btn-block">No — I need help</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= LOCK SCREEN ================= -->
+<div id="lockScreen" hidden>
+  <div class="lock-top"><div class="lock-ic">🔒</div></div>
+  <p class="lock-title">Protection locked</p>
+  <p class="lock-sub">Enter your PIN to turn off monitoring for this journey.</p>
+  <div class="dots" id="pinDots" style="margin-top:auto"></div>
+  <p class="err" id="lockErr" hidden style="margin-bottom:8px"></p>
+  <div class="keypad" id="keypad"></div>
+  <button id="btnUnlock" class="btn btn-ghost" disabled>Unlock</button>
+  <button id="btnLockCancel" class="btn" style="color:var(--label2);margin-top:4px">Cancel</button>
+</div>
+
+<!-- ================= DECOY ================= -->
+<div id="decoy" hidden>
+  <p class="dc-city" id="dcCity">New Delhi</p>
+  <p class="dc-temp" id="dcTemp">28°</p>
+  <p class="dc-cond">Partly Cloudy</p>
+  <p class="dc-hi">H: 32°  L: 19°</p>
+  <div class="dc-card">
+    <div class="dc-hours">
+      <div><div>Now</div><div class="hr">☁️</div><div>28°</div></div>
+      <div><div>1 PM</div><div class="hr">☁️</div><div>29°</div></div>
+      <div><div>2 PM</div><div class="hr">🌤</div><div>31°</div></div>
+      <div><div>3 PM</div><div class="hr">🌤</div><div>32°</div></div>
+      <div><div>4 PM</div><div class="hr">🌥</div><div>30°</div></div>
+    </div>
+  </div>
+  <p class="dc-foot" id="dcFoot">Updated just now</p>
+</div>
+
+<!-- ================= FAKE CALL ================= -->
+<div id="fakeCall" hidden>
+  <div class="fc-avatar" id="fcAvatar">P</div>
+  <p class="fc-name" id="fcName">Papa</p>
+  <p class="fc-sub" id="fcSub">mobile</p>
+  <p class="fc-status" id="fcStatus">Incoming call…</p>
+  <div class="fc-btns">
+    <button class="fc-btn fc-decline" id="fcDecline"><i>✕</i>Decline</button>
+    <button class="fc-btn fc-accept" id="fcAccept"><i>📞</i><span id="fcAcceptLabel">Accept</span></button>
+  </div>
+</div>
+
+<div id="strobe" hidden></div>
+<div id="toasts"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ===================================================================== *
+ *  HER GUARD — iOS-style safety client
+ *  Talks to: /api/register-user, /api/start-journey, /api/end-journey,
+ *            /api/analyze-risk, /api/telemetry/point, /api/checkin/*,
+ *            /api/trigger-sos, /api/acknowledge-sos, /api/escalate-tier2,
+ *            /api/verify-pin, /api/covert/escalate, /api/safe-havens
+ * ===================================================================== */
+const $ = (id) => document.getElementById(id);
+const BASE = location.protocol.startsWith("http") ? location.origin : "http://127.0.0.1:8000";
+const FALLBACK = { lat: 28.2455, lng: 77.0690 };
+
+const HAVEN_ICON = { Police: "🚓", "Campus QRT": "🛡️", Metro: "🚇", Pharmacy: "💊", "Help Desk": "👮", Hospital: "🏥" };
+
+const state = {
+  profile: null,
+  journey: false,
+  risk: 0,
+  view: "home",
+  map: null, tile: null, trail: null, me: null, havenPins: [], havens: [],
+  routeLine: null, originPin: null, destPin: null, picking: false,
+  watchId: null, origin: null, here: null, speed: 0, lastMove: Date.now(), trailPts: [],
+  busy: false, lastPush: 0,
+  trip: null,
+  planning: { dest: null, origin: null, results: [] },
+  voice: { active: false, rec: null, timer: null, primed: false, fired: false, cooldown: 0 },
+  sos: { active: false, acknowledged: false, dispatchDone: false, timer: null },
+  checkin: { open: false, timer: null, cooldown: 0 },
+  audio: { ctx: null, siren: null },
+  strobe: null,
+  shake: false, shakeHits: [],
+  covert: { armed: false, payload: null, timer: null },
+  call: { ring: null, tick: null, connected: false, vibrate: null },
+  links: {}, guardianPhone: "", dispatch: [],
+};
+
+/* ------------------------------- utils ------------------------------- */
+function toast(msg, tone) {
+  const el = document.createElement("div");
+  el.className = "toast" + (tone ? " " + tone : "");
+  el.textContent = msg;
+  $("toasts").appendChild(el);
+  setTimeout(() => {
+    el.style.transition = "opacity .3s ease";
+    el.style.opacity = "0";
+    setTimeout(() => el.remove(), 320);
+  }, 3200);
+}
+function buzz(pattern) {
+  try { navigator.vibrate && navigator.vibrate(pattern); } catch (_) { /* unsupported */ }
+}
+async function api(path, body) {
+  try {
+    const res = await fetch(BASE + path, body === undefined ? undefined : {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    const text = await res.text();
+    return text ? JSON.parse(text) : {};
+  } catch (_) {
+    return null;
+  }
+}
+function haversine(a, b) {
+  const R = 6371000, rad = (d) => (d * Math.PI) / 180;
+  const dPhi = rad(b.lat - a.lat), dLam = rad(b.lng - a.lng);
+  const h = Math.sin(dPhi / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLam / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const isNight = () => { const h = new Date().getHours(); return h >= 20 || h < 6; };
+const initials = (s) => (s || "?").trim().charAt(0).toUpperCase();
+
+function coords() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(FALLBACK);
+    const t = setTimeout(() => resolve(null), 2600);
+    navigator.geolocation.getCurrentPosition(
+      (p) => { clearTimeout(t); resolve({ lat: p.coords.latitude, lng: p.coords.longitude }); },
+      () => { clearTimeout(t); resolve(null); },
+      { timeout: 2200, maximumAge: 30000 }
+    );
+  });
+}
+
+/* ------------------------------- audio ------------------------------- */
+function ctx() {
+  const C = window.AudioContext || window.webkitAudioContext;
+  if (!C) return null;
+  state.audio.ctx = state.audio.ctx || new C();
+  if (state.audio.ctx.state === "suspended") state.audio.ctx.resume();
+  return state.audio.ctx;
+}
+function startSiren() {
+  const ac = ctx();
+  if (!ac || state.audio.siren) return;
+  const osc = ac.createOscillator(), gain = ac.createGain();
+  const lfo = ac.createOscillator(), lfoGain = ac.createGain();
+  osc.type = "sawtooth"; osc.frequency.value = 780;
+  gain.gain.value = 0.17;
+  lfo.type = "sine"; lfo.frequency.value = 2.4; lfoGain.gain.value = 430;
+  lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+  osc.connect(gain); gain.connect(ac.destination);
+  osc.start(); lfo.start();
+  state.audio.siren = { osc, gain, lfo };
+}
+function stopSiren() {
+  const s = state.audio.siren;
+  if (!s) return;
+  try {
+    s.osc.stop(); s.lfo.stop();
+    s.osc.disconnect(); s.lfo.disconnect(); s.gain.disconnect();
+  } catch (_) { /* already torn down */ }
+  state.audio.siren = null;
+}
+function chime() {
+  const ac = ctx();
+  if (!ac) return;
+  [880, 1180].forEach((f, i) => {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = "sine"; o.frequency.value = f;
+    const at = ac.currentTime + i * 0.18;
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(0.13, at + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+    o.connect(g); g.connect(ac.destination);
+    o.start(at); o.stop(at + 0.2);
+  });
+}
+
+/* ------------------------------- strobe ------------------------------ */
+function startStrobe() {
+  if (state.strobe) return;
+  const el = $("strobe");
+  el.hidden = false;
+  let white = false;
+  state.strobe = setInterval(() => {
+    white = !white;
+    el.style.background = white ? "rgba(255,255,255,.85)" : "rgba(255,55,95,.4)";
+  }, 170);
+}
+function stopStrobe() {
+  if (state.strobe) { clearInterval(state.strobe); state.strobe = null; }
+  $("strobe").hidden = true;
+}
+
+/* ------------------------------- router ------------------------------ */
+function go(view) {
+  state.view = view;
+  document.querySelectorAll(".view").forEach((s) => { s.hidden = s.dataset.view !== view; });
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.goto === view));
+  // Instant, like a native tab change: an animated scroll would let the next
+  // tap land on whatever slides underneath the finger.
+  window.scrollTo(0, 0);
+  if (view === "radar") {
+    initMap();
+    setTimeout(() => state.map && state.map.invalidateSize(), 120);
+  }
+}
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
+  buzz(8);
+  go(t.dataset.goto);
+}));
+
+/* ------------------------------- onboarding -------------------------- */
+$("onboardForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const pin = $("fPin").value.trim(), duress = $("fDuress").value.trim();
+  const err = $("onboardErr");
+  const fail = (m) => { err.textContent = m; err.hidden = false; };
+
+  if (!/^\d{4,8}$/.test(pin)) return fail("Safety PIN must be 4–8 digits.");
+  if (!/^\d{4,8}$/.test(duress)) return fail("Duress PIN must be 4–8 digits.");
+  if (pin === duress) return fail("Duress PIN must be different from your safety PIN.");
+  err.hidden = true;
+
+  const body = {
+    name: $("fName").value.trim(), phone: $("fPhone").value.trim(),
+    guardian_1_name: $("fG1Name").value.trim(), guardian_1_phone: $("fG1Phone").value.trim(),
+    guardian_2_name: $("fG2Name").value.trim(), guardian_2_phone: $("fG2Phone").value.trim(),
+    pin, duress_pin: duress,
+  };
+  const r = await api("/api/register-user", body);
+  if (!r || r.error) return fail((r && r.error) || "Could not reach the safety server.");
+
+  state.profile = body;
+  state.guardianPhone = body.guardian_1_phone;
+  $("onboarding").hidden = true;
+  renderProfile();
+  buzz(20);
+  toast("You're protected. Start a journey when you head out.", "ok");
+});
+
+function renderProfile() {
+  const p = state.profile;
+  if (!p) return;
+  const h = new Date().getHours();
+  $("greeting").textContent = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  $("userName").textContent = p.name.split(" ")[0];
+  $("avatar").textContent = initials(p.name);
+  $("profileName").textContent = p.name;
+  $("profilePhone").textContent = p.phone;
+
+  const rows = [["Guardian 1", p.guardian_1_name, p.guardian_1_phone], ["Guardian 2", p.guardian_2_name, p.guardian_2_phone]]
+    .filter((r) => r[2]);
+  $("guardianList").innerHTML = rows.map(([role, name, phone]) => `
+    <li><div class="ic">👤</div><div class="grow">
+      <p class="li-title">${esc(name)}</p><p class="li-sub">${esc(role)} · ${esc(phone)}</p>
+    </div><span class="chip">Alerted first</span></li>`).join("");
+  $("profileGuardians").innerHTML = rows.map(([role, name, phone]) => `
+    <li><div class="ic blue">👤</div><div class="grow">
+      <p class="li-title">${esc(name)}</p><p class="li-sub">${esc(role)} · ${esc(phone)}</p>
+    </div></li>`).join("");
+
+  $("fcName").textContent = p.guardian_1_name;
+  $("fcAvatar").textContent = initials(p.guardian_1_name);
+}
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+/* ------------------------------- journey ----------------------------- */
+$("btnJourney").addEventListener("click", async () => {
+  if (!state.journey) return openPlanner();
+  const r = await api("/api/end-journey", {});
+  if (!r) return toast("Couldn't reach the server");
+  finishJourney();
+  $("purgeSub").textContent = "Trail cleared just now";
+  toast("Journey ended — your route has been erased", "ok");
+});
+
+function finishJourney() {
+  stopTracking();
+  stopVoiceWatch();
+  resetAlarm();
+  endCheckin(true);
+  state.journey = false;
+  state.trip = null;
+  state.risk = 0;
+  state.sos.active = false;
+  $("tripCard").hidden = true;
+  $("sosPanel").hidden = true;
+  $("escalationActions").hidden = true;
+  clearRoute();
+  setRisk(0, "All clear", "Plan a journey to switch on live route watching.");
+  renderJourneyState();
+}
+
+/* --------------------------- journey planner ------------------------- */
+function openPlanner() {
+  state.planning = { dest: null, origin: null, results: [] };
+  $("destSearch").value = "";
+  $("destResults").hidden = true;
+  $("destResults").innerHTML = "";
+  $("planPreview").hidden = true;
+  $("btnStartPlanned").disabled = true;
+  $("planFromLabel").textContent = "Your current location";
+  $("planSheet").hidden = false;
+}
+$("btnClosePlan").addEventListener("click", () => { $("planSheet").hidden = true; state.picking = false; });
+
+let searchTimer = null;
+$("destSearch").addEventListener("input", (e) => {
+  const q = e.target.value.trim();
+  clearTimeout(searchTimer);
+  if (q.length < 3) { $("destResults").hidden = true; return; }
+  searchTimer = setTimeout(() => searchPlaces(q), 450);
+});
+
+async function searchPlaces(q) {
+  const r = await api(`/api/geocode?q=${encodeURIComponent(q)}`);
+  const list = $("destResults");
+  if (!r || !r.results || !r.results.length) {
+    list.innerHTML = `<li style="padding:10px 0;border:none"><p class="li-sub">${esc((r && r.error) || "No matches — try “Choose on map”.")}</p></li>`;
+    list.hidden = false;
+    return;
+  }
+  state.planning.results = r.results;
+  list.innerHTML = r.results.map((p, i) => `
+    <li style="padding:0;border:none">
+      <button class="result" data-i="${i}">
+        <span>📍</span>
+        <span class="grow">
+          <span class="li-title">${esc(p.label)}</span>
+          <span class="li-sub">${esc((p.full || "").slice(0, 64))}</span>
+        </span>
+      </button>
+    </li>`).join("");
+  list.hidden = false;
+  list.querySelectorAll("[data-i]").forEach((b) =>
+    b.addEventListener("click", () => chooseDestination(state.planning.results[Number(b.dataset.i)])));
+}
+
+async function chooseDestination(place) {
+  state.planning.dest = { lat: place.lat, lng: place.lng, label: place.label || "Destination" };
+  $("destResults").hidden = true;
+  $("destSearch").value = state.planning.dest.label;
+  $("planPreview").hidden = false;
+  $("planPreview").textContent = "Locking the route…";
+  $("btnStartPlanned").disabled = true;
+
+  const origin = await resolveOrigin();
+  if (!origin) return ($("planPreview").textContent = "Location is off — turn it on to plan this journey.");
+  state.planning.origin = origin;
+
+  const p = await api("/api/journey/plan", { origin, destination: state.planning.dest });
+  if (!p || p.error) {
+    $("planPreview").textContent = "Route service is busy — we'll still watch your direct corridor.";
+  } else {
+    $("planPreview").innerHTML = `<b>${(p.distance_m / 1000).toFixed(1)} km</b> · ~${Math.max(1, Math.round(p.duration_s / 60))} min · ${p.source === "osrm" ? "road route locked" : "direct corridor"}`;
+  }
+  $("btnStartPlanned").disabled = false;
+}
+
+async function resolveOrigin() {
+  const manual = $("fromInput").value.trim();
+  if (manual) {
+    const parts = manual.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      const lat = parseFloat(parts[0]);
+      const lng = parseFloat(parts[1]);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        toast("Using the coordinates you typed", "ok");
+        return { lat, lng, label: manual.slice(0, 40) };
+      }
+    }
+    // Try to geocode the free-text location name.
+    const r = await api(`/api/geocode?q=${encodeURIComponent(manual)}`);
+    if (r && r.results && r.results.length) {
+      const p = r.results[0];
+      toast(`Geocoded to ${p.label}`, "ok");
+      return { lat: p.lat, lng: p.lng, label: p.label || manual };
+    }
+    return null;
+  }
+  if (state.here) return { lat: state.here.lat, lng: state.here.lng, label: "Your current location" };
+  const c = await coords();
+  if (c) {
+    state.here = { ...c, accuracy: 20 };
+    return { lat: c.lat, lng: c.lng, label: "Your current location" };
+  }
+  // Geolocation is denied or unavailable: fall back to the demo origin
+  // so the user can still plan and start a journey, and prompt them to
+  // type coordinates in the "From" field if they want precision.
+  toast("Location access is off — starting from your demo position", "ok");
+  return { lat: FALLBACK.lat, lng: FALLBACK.lng, label: "Demo position" };
+}
+
+$("btnPickMap").addEventListener("click", () => {
+  $("planSheet").hidden = true;
+  go("radar");
+  state.picking = true;
+  toast("Tap the map to drop your destination");
+});
+
+$("btnStartPlanned").addEventListener("click", async () => {
+  const origin = state.planning.origin || (await resolveOrigin());
+  const dest = state.planning.dest;
+  if (!origin || !dest) return toast("Pick a destination first");
+
+  const r = await api("/api/start-journey", { origin, destination: dest });
+  if (!r || r.error) return toast((r && r.error) || "Couldn't start the journey");
+
+  state.journey = true;
+  state.sos = { active: false, acknowledged: false, dispatchDone: false, timer: null };
+  state.trip = {
+    dest, origin,
+    distance: r.distance_m, duration: r.duration_s,
+    route: r.route, source: r.route_source, progress: 0,
+  };
+
+  $("planSheet").hidden = true;
+  $("tripCard").hidden = false;
+  $("tripDest").textContent = dest.label;
+  $("tripBar").style.width = "0%";
+  $("tripRemaining").textContent = (r.distance_m / 1000).toFixed(1) + " km to go";
+  $("tripEta").textContent = "~" + Math.max(1, Math.round(r.duration_s / 60)) + " min";
+  $("tripStatus").textContent = "On route";
+  $("tripStatus").className = "chip live";
+  $("tripNote").hidden = true;
+  $("tripCard").classList.remove("trip-off");
+
+  drawRoute(r.route, origin, dest);
+  startTracking();
+  primeVoicePermission();
+  renderJourneyState();
+  go("home");
+  buzz(15);
+  toast("Journey started — route locked, voice watch on standby", "ok");
+});
+
+function drawRoute(points, origin, dest) {
+  if (!points) return;
+  if (!state.map) initMap();
+  if (!state.map) return;
+  clearRoute();
+  state.routeLine = L.polyline(points, { color: "#0a84ff", weight: 5, opacity: .9 }).addTo(state.map);
+  state.originPin = L.marker([origin.lat, origin.lng], {
+    icon: L.divIcon({ className: "", html: '<div class="haven-pin">🏁</div>', iconSize: [26, 26], iconAnchor: [13, 13] }),
+  }).addTo(state.map).bindPopup("Start");
+  state.destPin = L.marker([dest.lat, dest.lng], {
+    icon: L.divIcon({ className: "", html: '<div class="haven-pin">📍</div>', iconSize: [26, 26], iconAnchor: [13, 13] }),
+  }).addTo(state.map).bindPopup(`<b>${esc(dest.label)}</b>`);
+  state.map.fitBounds(L.latLngBounds(points), { padding: [28, 28] });
+}
+function clearRoute() {
+  [state.routeLine, state.originPin, state.destPin].forEach((l) => l && l.remove());
+  state.routeLine = state.originPin = state.destPin = null;
+}
+
+function renderJourneyState() {
+  const dot = $("stateDot");
+  dot.className = "state-dot" + (state.journey ? " on" : "");
+  $("statusTitle").textContent = state.journey ? "Protected" : "Protection off";
+  $("statusSub").textContent = state.journey
+    ? "Watching your route, speed and stops in real time"
+    : "Plan a journey to switch on route watching";
+  $("btnJourney").textContent = state.journey ? "End Journey" : "Start Journey";
+  $("btnJourney").className = "btn grow " + (state.journey ? "btn-ghost" : "btn-primary");
+}
+
+/* ------------------------------- telemetry --------------------------- */
+function startTracking() {
+  if (state.watchId !== null || !navigator.geolocation) return;
+  state.origin = null; state.trailPts = []; state.lastMove = Date.now();
+  if (state.trail) state.trail.setLatLngs([]);
+  state.watchId = navigator.geolocation.watchPosition(onFix, onFixError, {
+    enableHighAccuracy: true, maximumAge: 2000, timeout: 15000,
+  });
+}
+function stopTracking() {
+  if (state.watchId !== null) { navigator.geolocation.clearWatch(state.watchId); state.watchId = null; }
+}
+function onFixError() {
+  toast("Location is off — open settings to enable it", "err");
+}
+function onFix(pos) {
+  const here = {
+    lat: pos.coords.latitude,
+    lng: pos.coords.longitude,
+    accuracy: pos.coords.accuracy || 0,
+  };
+  if (pos.coords.speed != null && pos.coords.speed >= 0) state.speed = pos.coords.speed * 3.6;
+
+  if (!state.origin) {
+    state.origin = here;
+    loadHavens(here);
+    if (state.map && !state.trip) state.map.setView([here.lat, here.lng], 16);
+  }
+  state.here = here;
+
+  state.trailPts.push([here.lat, here.lng]);
+  if (state.trailPts.length > 400) state.trailPts.shift();
+  if (state.me) state.me.setLatLng([here.lat, here.lng]);
+  if (state.trail) state.trail.setLatLngs(state.trailPts);
+
+  trackNow();
+}
+
+async function trackNow() {
+  if (!state.journey || state.busy || !state.here) return;
+  // Poll faster while voice watch is live so an answer is not missed.
+  if (Date.now() - state.lastPush < (state.voice.active ? 3000 : 5000)) return;
+  state.lastPush = Date.now();
+  state.busy = true;
+
+  const r = await api("/api/journey/track", {
+    lat: state.here.lat,
+    lng: state.here.lng,
+    speed_kmh: Number((state.speed || 0).toFixed(1)),
+    accuracy_m: state.here.accuracy || 0,
+    ts: Date.now() / 1000,
+  });
+  state.busy = false;
+  if (!r || r.error) return;
+
+  renderTrip(r);
+  const high = r.risk_score >= 75;
+  setRisk(r.risk_score, high ? "Route anomaly" : "On route", r.factors.join(" · "));
+
+  if (r.arrived) return onArrived();
+
+  if (r.voice_mode_required) {
+    startVoiceWatch(r.factors.join(" · "));
+  } else if (high && !state.checkin.open && !state.voice.active && Date.now() > state.checkin.cooldown) {
+    openCheckin(r.factors.join(" · "));
+  }
+}
+
+function renderTrip(r) {
+  if (!state.trip) return;
+  state.trip.progress = r.progress;
+  $("tripBar").style.width = Math.round(r.progress * 100) + "%";
+  $("tripRemaining").textContent = r.remaining_m > 1000
+    ? (r.remaining_m / 1000).toFixed(1) + " km to go"
+    : r.remaining_m + " m to go";
+  $("tripEta").textContent = r.arrived ? "Arrived" : "~" + r.eta_min + " min";
+
+  const off = !!r.off_route;
+  $("tripCard").classList.toggle("trip-off", off);
+  $("tripStatus").textContent = off ? "Off route" : (r.stop_seconds > 90 ? "Stopped" : "On route");
+  $("tripStatus").className = "chip " + (off ? "t2" : "live");
+
+  const note = $("tripNote");
+  if (r.factors && r.factors.length) {
+    note.hidden = false;
+    note.textContent = r.factors.join(" · ");
+  }
+}
+
+async function onArrived() {
+  if (!state.journey) return;
+  await api("/api/end-journey", {});
+  finishJourney();
+  $("purgeSub").textContent = "Route erased on arrival";
+  toast("You've arrived — route data erased", "ok");
+}
+
+/* ---------------------------- voice watch ---------------------------- */
+const VOICE_KEYWORDS = ["bachao", "help", "madad", "save me", "बचाओ", "मदद", "हेल्प"];
+
+function speak(text) {
+  try {
+    if (!window.speechSynthesis) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "hi-IN";
+    u.rate = 0.95;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch (_) { /* no voice on this device */ }
+}
+
+/* Ask for the mic while the user is still tapping (browsers require a gesture),
+   so the automatic activation later does not need one. */
+function primeVoicePermission() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR || state.voice.primed) return;
+  try {
+    const rec = new SR();
+    rec.lang = "hi-IN";
+    rec.interimResults = false;
+    rec.onend = () => { state.voice.primed = true; };
+    rec.onerror = () => { state.voice.primed = true; };
+    rec.start();
+    setTimeout(() => { try { rec.abort(); } catch (_) {} }, 1200);
+  } catch (_) { /* mic blocked; voice watch will fall back to the check-in */ }
+}
+
+function startVoiceWatch(reason) {
+  if (state.voice.active || Date.now() < state.voice.cooldown) return;
+  state.voice.active = true;
+  state.voice.fired = false;
+  $("voiceMode").hidden = false;
+  $("voiceHint").textContent = reason ? reason.slice(0, 58) : "Say \u201cBachao\u201d or \u201cHelp\u201d";
+  buzz([30, 60, 30]);
+
+  speak("Kya aap safe hain? Madad ke liye Bachao bolein.");
+
+  listenLoop();
+  clearTimeout(state.voice.timer);
+  state.voice.timer = setTimeout(() => {
+    if (!state.voice.active) return;
+    stopVoiceWatch();
+    state.voice.cooldown = Date.now() + 60000;
+    openCheckin("We couldn't hear you. Are you safe?");
+  }, 18000);
+}
+
+function listenLoop() {
+  if (!state.voice.active) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    $("voiceHint").textContent = "Voice isn't available — tap SOS";
+    return;
+  }
+  const rec = new SR();
+  rec.lang = "hi-IN";
+  rec.continuous = true;
+  rec.interimResults = true;
+
+  rec.onresult = (e) => {
+    let said = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) said += e.results[i][0].transcript + " ";
+    said = said.toLowerCase();
+    if (VOICE_KEYWORDS.some((k) => said.includes(k))) {
+      state.voice.fired = true;
+      stopVoiceWatch();
+      fireSos("Voice: " + said.trim().slice(0, 60), "voice");
+    }
+  };
+  rec.onerror = (ev) => {
+    if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+      $("voiceHint").textContent = "Microphone blocked — tap SOS";
+    }
+  };
+  rec.onend = () => {
+    if (state.voice.active && !state.voice.fired) setTimeout(() => { if (state.voice.active) listenLoop(); }, 350);
+  };
+
+  state.voice.rec = rec;
+  try { rec.start(); } catch (_) { /* retried on next poll */ }
+}
+
+function stopVoiceWatch() {
+  state.voice.active = false;
+  clearTimeout(state.voice.timer);
+  state.voice.timer = null;
+  if (state.voice.rec) {
+    try { state.voice.rec.abort(); } catch (_) { /* already stopped */ }
+    state.voice.rec = null;
+  }
+  $("voiceMode").hidden = true;
+  try { window.speechSynthesis && speechSynthesis.cancel(); } catch (_) {}
+}
+
+function setRisk(score, label, note) {
+  state.risk = score;
+  const arc = $("riskArc");
+  const high = score >= 75, mid = score >= 45 && !high;
+  const color = high ? "#ff375f" : mid ? "#ff9f0a" : "#30d158";
+  arc.setAttribute("stroke", color);
+  arc.setAttribute("stroke-dashoffset", String(289 * (1 - Math.min(score, 100) / 100)));
+  $("riskNum").textContent = score;
+  $("riskNum").style.color = high ? "#ff8098" : "#f5f5f7";
+  $("riskLabel").textContent = label;
+  $("riskNote").textContent = note || "Live telemetry starts with your journey.";
+  document.querySelector(".risk-ring").style.filter = high
+    ? "drop-shadow(0 0 22px rgba(255,55,95,.35))" : "none";
+}
+
+/* ------------------------------- map --------------------------------- */
+function initMap() {
+  if (state.map || typeof L === "undefined") return;
+  state.map = L.map("map", { zoomControl: false }).setView([FALLBACK.lat, FALLBACK.lng], 15);
+  L.control.zoom({ position: "bottomright" }).addTo(state.map);
+  state.tile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20
+    }).addTo(state.map);
+
+  state.me = L.marker([FALLBACK.lat, FALLBACK.lng], {
+    icon: L.divIcon({ className: "", html: '<div class="you"><i></i></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+  }).addTo(state.map);
+
+  state.trail = L.polyline([], { color: "#ff375f", weight: 4, opacity: .85 }).addTo(state.map);
+  state.map.on("click", onMapPick);
+  loadHavens(state.here || FALLBACK);
+}
+
+async function onMapPick(e) {
+  if (!state.picking) return;
+  state.picking = false;
+  const place = { lat: e.latlng.lat, lng: e.latlng.lng, label: "Dropped pin" };
+  $("planSheet").hidden = false;
+  await chooseDestination(place);
+}
+
+async function loadHavens(at) {
+  const data = await api(`/api/safe-havens?lat=${at.lat.toFixed(5)}&lng=${at.lng.toFixed(5)}`);
+  if (!data || !data.all) return;
+  state.havens = data.all;
+  $("havenChip").textContent = `${data.nearest.length} nearby`;
+  $("havenChip").className = "chip live";
+
+  if (state.map) {
+    state.havenPins.forEach((m) => m.remove());
+    state.havenPins = data.all.map((h) => L.marker([h.lat, h.lng], {
+      icon: L.divIcon({ className: "", html: `<div class="haven-pin">${HAVEN_ICON[h.type] || "📍"}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
+    }).addTo(state.map).bindPopup(
+      `<b>${esc(h.name)}</b><br><span style="color:rgba(235,235,245,.6)">${esc(h.type)} · ${(h.distance_m / 1000).toFixed(2)} km · ~${h.eta_min} min walk</span><br><a href="tel:${esc(h.phone)}" style="color:#ff375f">Call ${esc(h.phone)}</a>`
+    ));
+  }
+
+  $("havenList").innerHTML = data.nearest.map((h) => `
+    <li>
+      <div class="ic">${HAVEN_ICON[h.type] || "📍"}</div>
+      <div class="grow">
+        <p class="li-title">${esc(h.name)}</p>
+        <p class="li-sub">${esc(h.type)} · ~${h.eta_min} min walk</p>
+      </div>
+      <a class="chip" href="tel:${esc(h.phone)}" style="text-decoration:none">${(h.distance_m / 1000).toFixed(2)} km</a>
+    </li>`).join("");
+}
+
+/* ------------------------------- SOS --------------------------------- */
+let holdTimer = null, holdStart = 0;
+
+function renderSosRing(progress) {
+  $("sosRing").setAttribute("stroke-dashoffset", String(534 * (1 - progress)));
+}
+$("btnSos").addEventListener("pointerdown", () => {
+  holdStart = Date.now();
+  buzz(18);
+  holdTimer = setInterval(() => {
+    const p = Math.min(1, (Date.now() - holdStart) / 3000);
+    renderSosRing(p);
+    if (p >= 1) { clearInterval(holdTimer); holdTimer = null; fireSos("Long-press trigger", "hold"); }
+  }, 40);
+});
+$("btnSos").addEventListener("pointerup", () => {
+  const held = Date.now() - holdStart;
+  if (holdTimer) { clearInterval(holdTimer); holdTimer = null; }
+  renderSosRing(0);
+  if (holdStart && held < 3000) fireSos("SOS button", "tap");
+  holdStart = 0;
+});
+// Dragging off the button cancels: an accidental swipe must not raise an alarm.
+["pointercancel", "pointerleave"].forEach((evt) =>
+  $("btnSos").addEventListener(evt, () => {
+    if (holdTimer) { clearInterval(holdTimer); holdTimer = null; }
+    renderSosRing(0);
+    holdStart = 0;
+  })
+);
+
+async function fireSos(reason, source) {
+  buzz([40, 60, 40, 60, 180]);
+  const c = await coords();
+  const body = { trigger_type: reason, language: "Hindi", source: source || "manual" };
+  if (c) { body.lat = c.lat; body.lng = c.lng; }
+
+  const r = await api("/api/trigger-sos", body);
+  if (!r) return toast("Couldn't reach the safety server — call 112 directly", "err");
+
+  state.links = r;
+  if (r.coordinates) {
+    state.here = r.coordinates;
+    if (state.me) state.me.setLatLng([r.coordinates.lat, r.coordinates.lng]);
+  }
+  $("sosMessage").textContent = r.ai_message || "Emergency alert prepared.";
+  $("sosPanelTitle").textContent = "Emergency alert ready to send";
+  $("sosPanel").hidden = false;
+  $("escalationActions").hidden = false;
+  $("sosPanel").scrollIntoView({ behavior: "smooth", block: "center" });
+  setTier("Tier 1 · guardians alerted", "t1");
+  startSiren(); startStrobe();
+  $("alarmLabel").textContent = "Alarm active";
+  $("alarmSub").textContent = "Tap to stop";
+  $("btnAlarm").classList.add("on");
+
+  state.sos.active = true;
+  state.sos.acknowledged = false;
+  state.sos.dispatchDone = false;
+  scheduleAutoEscalation();
+}
+
+/* If no guardian answers, the alert climbs to police dispatch on its own. */
+function scheduleAutoEscalation() {
+  clearTimeout(state.sos.timer);
+  state.sos.timer = setTimeout(async () => {
+    if (!state.sos.active || state.sos.acknowledged || state.sos.dispatchDone) return;
+    const r = await api("/api/escalate-tier2", {});
+    if (r && r.status === "ESCALATED_TIER_2") {
+      showDispatch(r.dispatched_to, r.reason);
+      startSiren(); startStrobe();
+      toast("No guardian response — police dispatch triggered", "err");
+    }
+  }, 45000);
+}
+
+$("btnSms").addEventListener("click", () => {
+  if (!state.links.sms_link) return toast("No guardian number on file");
+  location.href = state.links.sms_link;
+});
+$("btnWhatsapp").addEventListener("click", () => {
+  if (!state.links.whatsapp_link) return toast("No guardian number on file");
+  window.open(state.links.whatsapp_link, "_blank", "noopener");
+});
+$("btnCall112").addEventListener("click", () => { location.href = "tel:112"; });
+$("btnCallGuardian").addEventListener("click", () => {
+  if (!state.guardianPhone) return toast("No guardian number on file");
+  location.href = "tel:" + state.guardianPhone;
+});
+$("btnStopAlarm").addEventListener("click", () => {
+  resetAlarm();
+  toast("Alarm stopped");
+});
+
+function resetAlarm() {
+  stopSiren(); stopStrobe();
+  if (state.audio.ctx) { /* keep context warm for the next alert */ }
+  $("alarmLabel").textContent = "Siren & strobe";
+  $("alarmSub").textContent = "Off";
+  $("btnAlarm").classList.remove("on");
+}
+
+function setTier(text, kind) {
+  const chip = $("tierChip");
+  chip.textContent = text;
+  chip.className = "chip" + (kind ? " " + kind : "");
+}
+
+/* --------------------------- escalation ------------------------------ */
+$("btnAck").addEventListener("click", async () => {
+  const r = await api("/api/acknowledge-sos", {});
+  if (!r || r.status !== "ACKNOWLEDGED") return toast("Nothing to acknowledge");
+  state.sos.acknowledged = true;
+  clearTimeout(state.sos.timer);
+  resetAlarm();
+  setTier("Tier 1 · acknowledged", "t1");
+  $("escalationActions").hidden = true;
+  $("dispatchNote").hidden = false;
+  $("dispatchNote").textContent = "Your guardians confirmed the alert. Escalation is on hold.";
+  toast("Guardian acknowledged", "ok");
+});
+
+$("btnDispatch").addEventListener("click", async () => {
+  const r = await api("/api/escalate-tier2", {});
+  if (!r) return toast("Couldn't reach the server");
+  if (r.status === "ALREADY_ACKNOWLEDGED_BY_FAMILY")
+    return toast("Your family already acknowledged this alert");
+  if (r.status !== "ESCALATED_TIER_2") return toast("Trigger an SOS first");
+  showDispatch(r.dispatched_to, r.reason);
+  startSiren(); startStrobe();
+});
+
+function showDispatch(units, reason) {
+  state.sos.dispatchDone = true;
+  setTier("Tier 2 · dispatched", "t2");
+  $("escalationActions").hidden = true;
+  const note = $("dispatchNote");
+  note.hidden = false;
+  note.innerHTML = `<b style="color:#ffb3c4">Police and campus security dispatched.</b><br>` +
+    (units || []).map((u) => `· ${esc(u)}`).join("<br>") +
+    (reason ? `<br><span style="color:var(--label3)">Reason: ${esc(reason)}</span>` : "");
+}
+
+/* --------------------------- check-in -------------------------------- */
+const CD_CIRC = 308;
+async function openCheckin(reason) {
+  const r = await api("/api/checkin/start", { reason, risk_score: state.risk });
+  if (!r || r.error) return;
+  state.checkin.open = true;
+
+  const windowSec = r.window_seconds || 30;
+  const deadline = Date.now() + windowSec * 1000;
+  $("cdReason").textContent = reason || "A movement anomaly was detected on your route.";
+  $("checkin").hidden = false;
+  chime();
+  buzz([30, 80, 30]);
+
+  const tick = () => {
+    const left = Math.max(0, (deadline - Date.now()) / 1000);
+    $("cdNum").textContent = Math.ceil(left);
+    $("cdArc").setAttribute("stroke-dashoffset", String(CD_CIRC * (1 - left / windowSec)));
+    if (left <= 0) { endCheckin(); checkinTimeout(); }
+  };
+  tick();
+  state.checkin.timer = setInterval(tick, 200);
+}
+function endCheckin(silent) {
+  if (state.checkin.timer) { clearInterval(state.checkin.timer); state.checkin.timer = null; }
+  state.checkin.open = false;
+  $("checkin").hidden = true;
+  $("cdArc").setAttribute("stroke-dashoffset", "0");
+  if (!silent) return;
+}
+async function checkinTimeout() {
+  state.checkin.cooldown = Date.now() + 120000;
+  const r = await api("/api/checkin/timeout", {});
+  buzz([60, 80, 60, 80, 240]);
+  if (r && r.status === "ESCALATED_TIER_2") {
+    showDispatch(r.dispatched_to, r.reason);
+    startSiren(); startStrobe();
+    $("btnAlarm").classList.add("on");
+    $("alarmLabel").textContent = "Alarm active";
+    $("alarmSub").textContent = "Tap to stop";
+    toast("No response — police dispatch triggered", "err");
+  } else {
+    toast("No response to the check-in", "err");
+  }
+}
+$("btnSafe").addEventListener("click", async () => {
+  endCheckin();
+  const r = await api("/api/checkin/resolve", { safe: true });
+  if (r) {
+    setRisk(Math.max(0, state.risk - 40), "All clear", "Thanks — escalation was cancelled.");
+    setTier("Active monitoring", "live");
+    toast("Marked safe", "ok");
+  }
+});
+$("btnUnsafe").addEventListener("click", async () => {
+  endCheckin();
+  const r = await api("/api/checkin/resolve", { safe: false });
+  buzz([60, 80, 60, 80, 240]);
+  if (r && r.status === "ESCALATED_TIER_2") {
+    showDispatch(r.dispatched_to, r.reason);
+    startSiren(); startStrobe();
+    toast("Help is being dispatched", "err");
+  } else {
+    toast("Couldn't reach the server — call 112", "err");
+  }
+});
+
+/* --------------------------- quick actions --------------------------- */
+$("btnAlarm").addEventListener("click", () => {
+  if (state.audio.siren || state.strobe) {
+    resetAlarm(); toast("Alarm stopped");
+  } else {
+    startSiren(); startStrobe();
+    $("alarmLabel").textContent = "Alarm active";
+    $("alarmSub").textContent = "Tap to stop";
+    $("btnAlarm").classList.add("on");
+    buzz([40, 60, 40]);
+  }
+});
+
+$("btnVoice").addEventListener("click", () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return toast("Voice isn't supported in this browser", "err");
+  const rec = new SR();
+  rec.lang = "hi-IN";
+  rec.onstart = () => { toast("Listening… say “help” or “bachao”"); buzz(15); };
+  rec.onresult = async (e) => {
+    const said = e.results[0][0].transcript.toLowerCase();
+    const hit = ["help", "bachao", "madad", "बचाओ", "मदद", "हेल्प"].some((k) => said.includes(k));
+    if (hit) { await fireSos("Voice trigger: " + said, "voice"); if (state.guardianPhone) location.href = "tel:" + state.guardianPhone; }
+    else toast("Heard: “" + said + "”");
+  };
+  rec.onerror = () => toast("Couldn't hear that — try again", "err");
+  rec.start();
+});
+
+$("btnShake").addEventListener("click", async () => {
+  if (state.shake) {
+    window.removeEventListener("devicemotion", onMotion);
+    state.shake = false;
+    $("shakeSub").textContent = "Off";
+    $("btnShake").classList.remove("on");
+    return;
+  }
+  try {
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+      const p = await DeviceMotionEvent.requestPermission();
+      if (p !== "granted") return toast("Motion access was denied", "err");
+    }
+    window.addEventListener("devicemotion", onMotion);
+    state.shake = true;
+    $("shakeSub").textContent = "Armed";
+    $("btnShake").classList.add("on");
+    buzz(15);
+  } catch (_) {
+    toast("Shake detection isn't available here", "err");
+  }
+});
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity;
+  if (!a) return;
+  if (Math.sqrt((a.x || 0) ** 2 + (a.y || 0) ** 2 + (a.z || 0) ** 2) < 26) return;
+  const now = Date.now();
+  state.shakeHits.push(now);
+  state.shakeHits = state.shakeHits.filter((t) => now - t < 1500);
+  if (state.shakeHits.length >= 3) {
+    state.shakeHits = [];
+    fireSos("Shake detected", "shake");
+  }
+}
+
+/* --------------------------- fake call ------------------------------- */
+function ringtone(on) {
+  if (state.call.ring) { clearInterval(state.call.ring); state.call.ring = null; }
+  if (state.call.vibrate) { clearInterval(state.call.vibrate); state.call.vibrate = null; }
+  if (!on) return;
+  const play = () => {
+    const ac = ctx();
+    if (!ac) return;
+    [1046, 784].forEach((f, i) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      const at = ac.currentTime + i * 0.22;
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(0.12, at + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.2);
+      o.connect(g); g.connect(ac.destination);
+      o.start(at); o.stop(at + 0.24);
+    });
+  };
+  play();
+  state.call.ring = setInterval(play, 1900);
+  const vib = () => buzz([500, 400, 500]);
+  vib();
+  state.call.vibrate = setInterval(vib, 2200);
+}
+$("btnFakeCall").addEventListener("click", () => {
+  state.call.connected = false;
+  $("fcStatus").textContent = "Incoming call…";
+  $("fcAcceptLabel").textContent = "Accept";
+  $("fcAccept").classList.remove("alt");
+  $("fakeCall").hidden = false;
+  ringtone(true);
+});
+$("fcDecline").addEventListener("click", () => {
+  ringtone(false);
+  $("fakeCall").hidden = true;
+  toast("Call declined");
+});
+$("fcAccept").addEventListener("click", () => {
+  if (state.call.connected) {
+    ringtone(false);
+    if (state.call.tick) { clearInterval(state.call.tick); state.call.tick = null; }
+    $("fakeCall").hidden = true;
+    state.call.connected = false;
+    toast("Call ended");
+    return;
+  }
+  state.call.connected = true;
+  ringtone(false);
+  const started = Date.now();
+  $("fcStatus").textContent = "00:00";
+  $("fcAcceptLabel").textContent = "End";
+  $("fcAccept").classList.add("alt");
+  state.call.tick = setInterval(() => {
+    const s = Math.floor((Date.now() - started) / 1000);
+    $("fcStatus").textContent = String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  }, 1000);
+});
+
+/* --------------------------- covert duress --------------------------- */
+const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
+let pin = "";
+function buildKeypad() {
+  $("keypad").innerHTML = KEYS.map((k) => k === ""
+    ? '<span></span>'
+    : `<button class="key${k === "⌫" ? " fn" : ""}" data-key="${k}">${k}</button>`).join("");
+  $("keypad").querySelectorAll("[data-key]").forEach((b) =>
+    b.addEventListener("click", () => pressKey(b.dataset.key)));
+}
+function paintDots() {
+  $("pinDots").innerHTML = Array.from({ length: Math.max(6, pin.length) })
+    .map((_, i) => `<span class="${i < pin.length ? "f" : ""}"></span>`).join("");
+  $("btnUnlock").disabled = pin.length < 4;
+}
+function pressKey(k) {
+  buzz(6);
+  if (k === "⌫") pin = pin.slice(0, -1);
+  else if (pin.length < 8) pin += k;
+  paintDots();
+}
+function openLock() {
+  pin = "";
+  $("lockErr").hidden = true;
+  paintDots();
+  $("lockScreen").hidden = false;
+}
+$("btnLock").addEventListener("click", openLock);
+$("btnLock2").addEventListener("click", openLock);
+$("btnLockCancel").addEventListener("click", () => { $("lockScreen").hidden = true; pin = ""; });
+
+$("btnUnlock").addEventListener("click", async () => {
+  if (pin.length < 4) return;
+  const c = await coords();
+  const body = { pin };
+  if (c) { body.lat = c.lat; body.lng = c.lng; }
+  const r = await api("/api/verify-pin", body);
+
+  if (!r || r.error) {
+    $("lockErr").textContent = (r && r.error) || "Server unreachable — try again.";
+    $("lockErr").hidden = false;
+    return;
+  }
+  if (r.mode === "invalid" || r.mode === "locked") {
+    $("lockErr").textContent = r.message + (r.attempts_left != null ? ` (${r.attempts_left} tries left)` : "");
+    $("lockErr").hidden = false;
+    $("pinDots").classList.add("shake");
+    setTimeout(() => $("pinDots").classList.remove("shake"), 460);
+    buzz([80, 60, 80]);
+    pin = "";
+    paintDots();
+    return;
+  }
+
+  // Both PINs resolve here and must look identical.
+  $("lockScreen").hidden = true;
+  pin = "";
+  disarm();
+  if (r.duress) startCovert(r.silent);
+});
+
+function disarm() {
+  stopTracking();
+  stopVoiceWatch();
+  resetAlarm();
+  endCheckin(true);
+  state.journey = false;
+  state.trip = null;
+  state.risk = 0;
+  state.sos.active = false;
+  $("tripCard").hidden = true;
+  clearRoute();
+  setRisk(0, "All clear", "Monitoring is off. Start a journey whenever you head out.");
+  renderJourneyState();
+  setTier("Standby");
+  $("escalationActions").hidden = true;
+  $("sosPanel").hidden = true;
+  state.dispatch = [];
+}
+
+/* Duress: show an innocuous screen, arm the silent alert in the background. */
+function startCovert(payload) {
+  state.covert.armed = true;
+  state.covert.payload = payload || null;
+  $("decoy").hidden = false;
+  buzz([20, 120, 20]);
+
+  const delay = ((payload && payload.escalate_after_seconds) || 20) * 1000;
+  if (state.covert.timer) clearTimeout(state.covert.timer);
+  state.covert.timer = setTimeout(async () => {
+    await api("/api/covert/escalate", {});
+    state.covert.timer = null;
+  }, delay);
+}
+function leaveDecoy() {
+  $("decoy").hidden = true;
+  state.covert.armed = false;
+  state.covert.payload = null;
+}
+/* Discreet exit: press and hold the temperature for 2 seconds. */
+(function decoyExit() {
+  let t = null;
+  $("dcTemp").addEventListener("pointerdown", () => { t = setTimeout(leaveDecoy, 2000); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach((e) =>
+    $("dcTemp").addEventListener(e, () => { if (t) { clearTimeout(t); t = null; } }));
+})();
+
+/* ------------------------------- boot -------------------------------- */
+buildKeypad();
+paintDots();
+renderJourneyState();
+setRisk(0, "All clear", "Live telemetry starts with your journey.");
+
+(async function boot() {
+  const h = await api("/api/health");
+  const pill = $("connPill");
+  if (h && h.status === "ok") {
+    pill.classList.add("ok");
+    $("connText").textContent = "Live";
+  } else {
+    pill.classList.add("bad");
+    $("connText").textContent = "Offline";
+  }
+})();
+
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
